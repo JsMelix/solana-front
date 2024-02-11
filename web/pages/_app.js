@@ -1,94 +1,90 @@
 import "../styles/globals.css";
-import Link from "next/link";
 import React, { useEffect, useState } from "react";
+import Link from "next/link";
 import styles from '../styles/Home.module.css';
 
 function MyApp({ Component, pageProps }) {
   const [walletAddress, setWalletAddress] = useState(null);
-
-  const checkIfWalletIsConnected = async () => {
-    const { solana } = window;
-
-    if (solana) {
-      if (solana.isPhantom) {
-        console.log("Se encontró la billetera Phantom");
-        const response = await solana.connect({ onlyIfTrusted: true});
-        setWalletAddress(response.publicKey.toString());
-      }
-    } else {
-      console.log("No se encontró la billetera Phantom");
-    }
-  };
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    const onLoad = async () => {
-      await checkIfWalletIsConnected();
+    const checkIfWalletIsConnected = async () => {
+      const { solana } = window;
+
+      if (solana && solana.isPhantom) {
+        console.log("Billetera Phantom detectada");
+        try {
+          const response = await solana.connect({ onlyIfTrusted: true });
+          setWalletAddress(response.publicKey.toString());
+        } catch (error) {
+          // No hacemos nada si la solicitud es rechazada
+        }
+      } else {
+        setError("Billetera Phantom no instalada. Descargue e instale la extensión para usar esta aplicación.");
+      }
     };
 
-    window.addEventListener("load", onLoad);
-    return () => window.removeEventListener("load", onLoad);
-  }, []);
+    checkIfWalletIsConnected();
 
-  const isPhantomInstalled = async () => {
-    const { solana } = window;
-  
-    if (solana && solana.isPhantom) {
-      return true;
-    } else {
-      throw new Error("Phantom no está instalado. Descargue e instale la extensión para usar esta aplicación.");
-    }
-  };
+    return () => {
+      // Limpiar efectos si es necesario
+    };
+  }, []);
 
   const connectToPhantom = async () => {
     try {
-      await isPhantomInstalled(); // Comprueba si Phantom está instalado
-  
-      const response = await window.solana.connect(); // Conecta a la billetera
-      console.log("Conectado con la clave pública:", response.publicKey.toString());
-      setWalletAddress(response.publicKey.toString()); // Almacena la clave pública
-    } catch (error) {
-      if (error.message === "User rejected the request.") {
-        console.error("El usuario rechazó la solicitud de conexión.");
-        // Podrías mostrar un mensaje al usuario aquí
-      } else {
-        console.error("Error al conectar con Phantom:", error.message);
+      const { solana } = window;
+      if (!solana || !solana.isPhantom) {
+        throw new Error("Billetera Phantom no instalada. Descargue e instale la extensión para usar esta aplicación.");
       }
+
+      const response = await solana.connect();
+      setWalletAddress(response.publicKey.toString());
+    } catch (error) {
+      setError("Error al conectar con Phantom: " + error.message);
     }
   };
 
   return (
     <div>
-      {
-        !walletAddress && (
-          <div className={styles.container}>
-            <button
-              className={styles.sol_connect_wallet_button}
-              onClick={connectToPhantom}
-            >
-              Conectarse
-            </button>
-          </div>
-        )
-      }
-      <div>
-        <main>
-          <nav className="border-b p-6">
-            <p className="text-4xl font-bold">Platzi Movies</p>
-            <div className="flex mt-4">
-              <Link href="/">
-                <a className="mr-4">Inicio</a>
-              </Link>
-              <Link href="/add-movie">
-                <a className="mr-6">Agregar Películas</a>
-              </Link>
-              <Link href="/my-movies">
-                <a className="mr-6">Mis Películas</a>
-              </Link>
-            </div>
-          </nav>
-        </main>
-        <Component {...pageProps} />
-      </div>
+      {error && (
+        <div className={styles.error}>
+          {error}
+        </div>
+      )}
+
+      {!walletAddress && !error && (
+        <div className={styles.container}>
+          <button
+            className={styles.sol_connect_wallet_button}
+            onClick={connectToPhantom}
+          >
+            Conectarse
+          </button>
+        </div>
+      )}
+
+      {walletAddress && (
+        <div>
+          <main>
+            <nav className="border-b p-6">
+              <p className="text-4xl font-bold">Platzi Movies</p>
+              <div className="flex mt-4">
+                <Link href="/">
+                  <a className="mr-4">Inicio</a>
+                </Link>
+                <Link href="/add-movie">
+                  <a className="mr-6">Agregar Películas</a>
+                </Link>
+                <Link href="/my-movies">
+                  <a className="mr-6">Mis Películas</a>
+                </Link>
+              </div>
+            </nav>
+          </main>
+          <Component {...pageProps} />
+        </div>
+      )}
     </div>
   );
 }
